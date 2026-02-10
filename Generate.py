@@ -188,7 +188,7 @@ def main(args=None) -> tuple[argparse.Namespace, int]:
                                             key in Options.CommonOptions.type_hints:
                                         yaml[category][key] = option
                             elif category_name not in yaml:
-                                logging.warning(f"Meta: Category {category_name} is not present in {path}.")
+                                pass
                             elif key == "triggers":
                                 if "triggers" not in yaml[category_name]:
                                     yaml[category_name][key] = []
