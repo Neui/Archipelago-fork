@@ -104,6 +104,25 @@ for folder in (folder for folder in (user_folder, local_folder) if folder):
 
 # import all submodules to trigger AutoWorldRegister
 world_sources.sort()
+
+# If we have both terraria/ and terraria.apworld, only load terraria.apworld
+import pathlib
+w = list(((pathlib.PurePath(src.path).stem, src.relative, src, i) for i, src in enumerate(world_sources)))
+w.sort()
+numdeleted = 0
+for left, right in list(zip(w, w[1:])):
+    i = right[3]
+    left, right = left[2], right[2]
+    left_path = pathlib.PurePath(left.path)
+    right_path = pathlib.PurePath(right.path)
+    if left_path.stem == right_path.stem \
+            and left.is_zip and not left.relative \
+            and not right.is_zip and right.relative:
+        logging.debug("Removing %r in favour of %r", right, left)
+        del world_sources[i - numdeleted]
+        numdeleted += 1
+del w
+
 apworlds: list[WorldSource] = []
 for world_source in world_sources:
     # load all loose files first:
