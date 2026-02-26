@@ -207,7 +207,7 @@ def main(args=None) -> tuple[argparse.Namespace, int]:
                             if category_name is None:
                                 for category in yaml:
                                     if category in AutoWorldRegister.world_types and \
-                                            key in Options.CommonOptions.type_hints:
+                                            key in Options.PerGameCommonOptions.type_hints:
                                         yaml[category][key] = option
                             elif category_name not in yaml:
                                 logging.warning(f"Meta: Category {category_name} is not present in {path}.")
