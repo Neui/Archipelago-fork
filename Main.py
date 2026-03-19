@@ -306,6 +306,8 @@ def main(args, seed=None, baked_server_options: dict[str, object] | None = None)
                         elif any([location.item.name in multiworld.worlds[player].options.start_hints
                                   for player in multiworld.groups.get(location.item.player, {}).get("players", [])]):
                             precollect_hint(location, auto_status)
+                        elif location.advancement:
+                            precollect_hint(location, auto_status)
 
                 # embedded data package
                 data_package = {
