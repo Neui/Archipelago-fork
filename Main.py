@@ -310,7 +310,7 @@ def main(args, seed=None, baked_server_options: dict[str, object] | None = None)
                                   for player in multiworld.groups.get(location.item.player, {}).get("players", [])]):
                             precollect_hint(location, auto_status)
                         elif location.item is not None and not location.item.advancement and not location.item.trap:
-                            precollect_hint(location, HintStatus.NO_PRIORITY)
+                            precollect_hint(location, HintStatus.HINT_NO_PRIORITY)
 
                 # embedded data package
                 data_package = {
