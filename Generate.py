@@ -67,6 +67,12 @@ def mystery_argparse(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Output rolled player options to csv (made for async multiworld).")
     parser.add_argument("--plando", default=defaults.plando_options,
                         help="List of options that can be set manually. Can be combined, for example \"bosses, items\"")
+    parser.add_argument("--check_ap_version", default=str(defaults.check_ap_version),
+                        help="Check and enforce Archipelago version requirement (true/false)")
+    parser.add_argument("--check_world_version", default=str(defaults.check_world_version),
+                        help="Check and enforce world version requirement (true/false)")
+    parser.add_argument("--check_enabled_world_versions_only", default=str(defaults.check_enabled_world_versions_only),
+                        help="Check only enabled world versions (requires --check_world_version=true) (true/false)")
     parser.add_argument("--skip_prog_balancing", action="store_true",
                         help="Skip progression balancing step during generation.")
     parser.add_argument("--skip_output", action="store_true",
@@ -87,6 +93,10 @@ def mystery_argparse(argv: list[str] | None = None) -> argparse.Namespace:
     if not os.path.isabs(args.meta_file_path):
         args.meta_file_path = os.path.join(args.player_files_path, args.meta_file_path)
     args.plando = PlandoOptions.from_option_string(args.plando)
+
+    args.check_ap_version = "true" in args.check_ap_version.lower()
+    args.check_world_version = "true" in args.check_world_version.lower()
+    args.check_enabled_world_versions_only = "true" in args.check_enabled_world_versions_only.lower()
 
     return args
 
@@ -233,7 +243,11 @@ def main(args=None) -> tuple[argparse.Namespace, int]:
     if args.sameoptions:
         for fname, yamls in weights_cache.items():
             try:
-                settings_cache[fname] = tuple(roll_settings(yaml, args.plando) for yaml in yamls)
+                settings_cache[fname] = tuple(roll_settings(yaml, args.plando,
+                                                            args.check_ap_version,
+                                                            args.check_world_version,
+                                                            args.check_enabled_world_versions_only
+                                                            ) for yaml in yamls)
             except Exception as e:
                 logging.exception(f"Exception reading settings in file {fname}")
                 err = PlayerFileError(f"File {fname} is invalid. Please fix your yaml.")
@@ -264,7 +278,11 @@ def main(args=None) -> tuple[argparse.Namespace, int]:
                 # Use the cached settings object if it exists, otherwise roll settings within the try-catch
                 # Invariant: settings_cache[path] and weights_cache[path] have the same length
                 cached = settings_cache[path]
-                settings_object: argparse.Namespace = (cached[doc_index] if cached else roll_settings(yaml, args.plando))
+                settings_object: argparse.Namespace = (cached[doc_index] if cached else roll_settings(
+                    yaml, args.plando,
+                    args.check_ap_version, args.check_world_version,
+                    args.check_enabled_world_versions_only
+                ))
 
                 for k, v in vars(settings_object).items():
                     if v is not None:
@@ -370,6 +388,18 @@ def get_choice(option, root, value=None) -> Any:
     if any(root[option].values()):
         return random.choices(list(root[option].keys()), weights=list(map(int, root[option].values())))[0]
     raise RuntimeError(f"All options specified in \"{option}\" are weighted as zero.")
+
+
+def get_available_choices(option, root, value=None) -> list[Any]:
+    if option not in root:
+        return [value]
+    if type(root[option]) is list:
+        return root[option]
+    if type(root[option]) is not dict:
+        return [root[option]]
+    if not root[option]:
+        return [value]
+    return [value for value, weight in root[option].items() if weight != 0]
 
 
 class SafeFormatter(string.Formatter):
@@ -539,7 +569,10 @@ def handle_option(ret: argparse.Namespace, game_weights: dict, option_key: str, 
         player_option.verify(AutoWorldRegister.world_types[ret.game], ret.name, plando_options)
 
 
-def roll_settings(weights: dict, plando_options: PlandoOptions = PlandoOptions.bosses):
+def roll_settings(weights: dict, plando_options: PlandoOptions = PlandoOptions.bosses,
+                  check_ap_version: bool = True,
+                  check_world_version: bool = True,
+                  check_enabled_world_versions_only: bool = True):
     """
     Roll options from specified weights, usually originating from a .yaml options file.
 
@@ -549,6 +582,9 @@ def roll_settings(weights: dict, plando_options: PlandoOptions = PlandoOptions.b
     """
 
     from worlds import AutoWorldRegister
+
+    # Do this before triggers so we don't roll game prematurely
+    available_games = get_available_choices("game", weights)
 
     if "linked_options" in weights:
         weights = roll_linked_options(weights)
@@ -560,7 +596,7 @@ def roll_settings(weights: dict, plando_options: PlandoOptions = PlandoOptions.b
     requirements = weights.get("requires", {})
     if requirements:
         version = requirements.get("version", __version__)
-        if tuplize_version(version) > version_tuple:
+        if tuplize_version(version) > version_tuple and check_ap_version:
             raise Exception(f"Settings reports required version of generator is at least {version}, "
                             f"however generator is of version {__version__}")
         required_plando_options = PlandoOptions.from_option_string(requirements.get("plando", ""))
@@ -572,15 +608,19 @@ def roll_settings(weights: dict, plando_options: PlandoOptions = PlandoOptions.b
         for game, version in games.items():
             if game not in AutoWorldRegister.world_types:
                 continue
+            if game not in available_games and check_enabled_world_versions_only:
+                continue
             if not version:
                 raise Exception(f"Invalid version for game {game}: {version}.")
             if isinstance(version, str):
                 version = {"min": version}
-            if "min" in version and tuplize_version(version["min"]) > AutoWorldRegister.world_types[game].world_version:
+            if "min" in version and check_world_version \
+                    and tuplize_version(version["min"]) > AutoWorldRegister.world_types[game].world_version:
                 raise Exception(f"Settings reports required version of world \"{game}\" is at least {version['min']}, "
                                 f"however world is of version "
                                 f"{AutoWorldRegister.world_types[game].world_version.as_simple_string()}.")
-            if "max" in version and tuplize_version(version["max"]) < AutoWorldRegister.world_types[game].world_version:
+            if "max" in version and check_world_version \
+                    and tuplize_version(version["max"]) < AutoWorldRegister.world_types[game].world_version:
                 raise Exception(f"Settings reports required version of world \"{game}\" is no later than {version['max']}, "
                                 f"however world is of version "
                                 f"{AutoWorldRegister.world_types[game].world_version.as_simple_string()}.")

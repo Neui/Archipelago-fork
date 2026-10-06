@@ -691,6 +691,22 @@ class GeneratorOptions(Group):
         start_inventory -> Move remaining items to start_inventory, generate additional filler items to fill locations.
         """
 
+    class CheckAPVersion(Bool):
+        """
+        Check and enforce Archipelago version requirement in player files.
+        """
+
+    class CheckWorldVersion(Bool):
+        """
+        Check and enforce world version requirements in player files.
+        """
+
+    class CheckEnabledWorldVersionsOnly(Bool):
+        """
+        Check only enabled world versions from requirements in player files.
+        Requires check_world_version to be enabled as well.
+        """
+
     player_files_path: PlayerFilesPath = PlayerFilesPath("Players")
     players: Players = Players(0)
     allow_quantity: AllowQuantity | bool = False
@@ -702,6 +718,9 @@ class GeneratorOptions(Group):
     panic_method: PanicMethod = PanicMethod("swap")
     loglevel: str = "info"
     logtime: bool = False
+    check_ap_version: CheckAPVersion = True
+    check_world_version: CheckWorldVersion = True
+    check_enabled_world_versions_only: CheckEnabledWorldVersionsOnly = True
 
 
 class SNIOptions(Group):
