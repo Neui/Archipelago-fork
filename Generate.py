@@ -466,7 +466,8 @@ def roll_meta_option(option_key, game: str, category_dict: dict) -> Any:
             return category_dict[option_key]
         if option_key == "triggers":
             return category_dict[option_key]
-    raise Options.OptionError(f"Error generating meta option {option_key} for {game}.")
+        raise Options.OptionError(f"Error generating meta option {option_key} for {game}.")
+    logging.warning(f"Unknwon game {game} in meta")
 
 
 def roll_linked_options(weights: dict) -> dict:
