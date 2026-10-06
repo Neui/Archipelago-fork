@@ -129,6 +129,17 @@ for folder in (folder for folder in (user_folder, local_folder) if folder):
 # import all submodules to trigger AutoWorldRegister
 logger.info("Processing found worlds")
 world_sources.sort()
+
+# Remove folders that are in local_folder ("relative") but we have a version of it in custom_worlds
+# so that custom_worlds always overwrites core
+custom_world_stems = [Path(world_source.resolved_path).stem
+                      for world_source in world_sources
+                      if not world_source.relative]
+world_sources = list(filter(lambda ws: not ws.relative or
+                            Path(ws.resolved_path).stem not in custom_world_stems,
+                            world_sources))
+del custom_world_stems
+
 apworlds: list[WorldSource] = []
 for world_source in world_sources:
     # load all loose files first:
